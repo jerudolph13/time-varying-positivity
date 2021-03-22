@@ -7,7 +7,7 @@
 #
 # Author: Jacqueline Rudolph
 #
-# Last Update: 18 Feb 2020
+# Last Update: 18 Feb 2021
 #
 ############################################################################################################## 
 
@@ -81,7 +81,8 @@ eager <- read.table(file="../data/eager_wide_hcg.txt", sep="\t", header=TRUE)
 
 
 # Specify models ----------------------------------------------------------
-  
+# NOTE: These models are not currently being used in the analysis
+
   base <- ifelse(param==1, base_param, base_nonparam)
   
   LYformula <- rep(NA, 3*maxt)
@@ -163,8 +164,6 @@ res <- data.frame(estimand=c("R1","R0","RD"), estimate=rep(NA,3), se=rep(NA,3))
 #Parametric LTMLE
   if (param==1){
     param_ltmle <- ltmle(dplyr::select(eager_param, -id), Anodes=Anodes, Cnodes=Cnodes, Lnodes=Lnodes, Ynodes=Ynodes, 
-                         #Qform=LYformula,
-                         #gform=ACformula,
                          abar=list(treatment=abar1, control=abar0), 
                          survivalOutcome=TRUE,
                          variance.method = "tmle",
@@ -178,18 +177,13 @@ res <- data.frame(estimand=c("R1","R0","RD"), estimate=rep(NA,3), se=rep(NA,3))
      res$se[3] <- summ$effect.measures$ATE$std.dev
     res$lower <- res$estimate - 1.96*res$se
     res$upper <- res$estimate + 1.96*res$se
-
-    #write.table(res, file="../results/results_param_hcg.txt", sep="\t", row.names=FALSE)
   }
 
 #Non-parametric LTMLE  
   if (param==0) {
-    SL.lib <- c("SL.glm", "SL.gam", "SL.earth", "SL.nnet", "SL.bayesglm") #, "SL.glmnet")#, "SL.svm")
-      #svm and glmnet would not run due to sparse data
+    SL.lib <- c("SL.glm", "SL.gam", "SL.earth", "SL.nnet", "SL.bayesglm")
 
     nonparam_ltmle <- ltmle(dplyr::select(eager, -id), Anodes=Anodes, Cnodes=Cnodes, Lnodes=Lnodes, Ynodes=Ynodes, 
-                            #Qform=LYformula,
-                            #gform=ACformula,
                             abar=list(treatment=abar1, control=abar0), 
                             survivalOutcome=TRUE, 
                             variance.method = "tmle",
@@ -202,33 +196,6 @@ res <- data.frame(estimand=c("R1","R0","RD"), estimate=rep(NA,3), se=rep(NA,3))
     res$estimate[3] <- summ$effect.measures$ATE$estimate
       res$se[3] <- summ$effect.measures$ATE$std.dev
     res$lower <- res$estimate - 1.96*res$se
-    res$upper <- res$estimate + 1.96*res$se
-      
-    write.table(res, file="../results/results_sl.txt", sep="\t", row.names=FALSE)
+    res$upper <- res$estimate + 1.96*res$se      
   }    
-
-
-# Positivity --------------------------------------------------------------
-
-#Let's look at positivity using propensity score overlap
-  #Cumulative probabilities of exposure and censoring from first intervention scenario
-  g1 <- param_ltmle$cum.g[ , , 1]
-  g_val <- as.data.frame(g1[ , seq(2,52, 2)]) #I believe this is pulling out the exposure probabilities
-  g_long <- g_val %>% 
-    pivot_longer(cols=starts_with("V"),
-                 names_to = "week",
-                 names_prefix = "V",
-                 values_to = "prob_g") %>% 
-    select(-week)
-  
-  eager_small <- eager_param[ , vars_select(names(eager_param), starts_with(c("id", "treatment", "compliance")))]
-  eager_long <- pivot_longer(eager_small, 
-                             cols=starts_with("compliance"),
-                             names_to="week",
-                             names_prefix="compliance",
-                             values_to = "compliance")
-  eager_g <- bind_cols(eager_long, g_long)
-  #write_csv(eager_g, file="../results/eager_ltmle_ps.csv")
-  
-
   
