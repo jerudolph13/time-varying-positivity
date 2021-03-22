@@ -60,7 +60,7 @@ bootrep <- function (r) {
   firstobs <- eager[eager$week == 1, ]
   samp <- table(firstobs[sample(1:nrow(firstobs), nrow(firstobs), replace=T), (names(eager) == "id")])
   
-  # The step below pulls in the simulated data for boot=0; otherwise grabs all records for the resampled observations
+  # The step below pulls in the original data for boot=0; otherwise grabs all records for the resampled observations
   boot <- NULL
   if(r==0){
     boot <- eager %>% 
@@ -76,7 +76,7 @@ bootrep <- function (r) {
 
   
 # TMLE-IPW ----------------------------------------------------------------
-  #Using the estimator in Laura's notes
+  # "Flexible" IPW
   
   # Compliance
   # Denominator models (to match TMLE, run one per time point)
@@ -102,12 +102,6 @@ bootrep <- function (r) {
   boot <- boot %>% 
     mutate(stab_trt_wt1 = unstab_trt_wt1/mean1,
            stab_trt_wt0 = unstab_trt_wt0/mean0)
-  
-  # Output cumulative propensity score if boot==0
-  # if (r==0) {
-  #   ps <- select(boot, c("bid", "week", "treatment", "compliance", "cum_ps_trt", "cum_comp"))
-  #   write.table(ps, file="../results/ps_dist.txt", sep="\t", row.names=FALSE)
-  # }
   
   # Drop out
   boot$ps_drop <- glm((1-drop) ~ treatment + compliance + compliance_1 + compliance_2 + 
