@@ -7,14 +7,13 @@
 #
 # Author: Jacqueline Rudolph
 #
-# Last Update: 11 Mar 2021
+# Last Update: 24 Jan 2021
 #
 ############################################################################################################## 
 
 
 packages <- c("survival", "tidyverse", "tidyselect", "data.table", "parallel", "geepack", "splines")
 for (package in packages) {
-  update.packages(package, ask=F)
   library(package, character.only=T)
 }
 
@@ -24,7 +23,7 @@ for (package in packages) {
 maxt <- 26
 
 # Number of bootstrap resamples
-nboot <- 200
+nboot <- 1000
 
 
 # Read in and prepare data ------------------------------------------------
@@ -74,12 +73,9 @@ bootrep <- function (r) {
     boot <- select(boot, -id)
   }
 
-  
-# TMLE-IPW ----------------------------------------------------------------
-  # "Flexible" IPW
-  
-  # Compliance
-  # Denominator models (to match TMLE, run one per time point)
+
+# Minimal smoothing -------------------------------------------------------
+  # Compliance models: run stratified by time
   boot$ps_trt <- rep(NA, dim(boot)[1])
   for (wk in 1:maxt) {
     dat <- filter(boot, week==wk)
@@ -102,6 +98,12 @@ bootrep <- function (r) {
   boot <- boot %>% 
     mutate(stab_trt_wt1 = unstab_trt_wt1/mean1,
            stab_trt_wt0 = unstab_trt_wt0/mean0)
+  
+  # Output cumulative propensity score if boot==0
+  # if (r==0) {
+  #   ps <- select(boot, c("bid", "week", "treatment", "compliance", "cum_ps_trt", "cum_comp"))
+  #   write.table(ps, file="../results/ps_dist.txt", sep="\t", row.names=FALSE)
+  # }
   
   # Drop out
   boot$ps_drop <- glm((1-drop) ~ treatment + compliance + compliance_1 + compliance_2 + 
@@ -230,12 +232,16 @@ res <- filter(all.boot, boot_num==0)
 
 boot.summ <- all.boot %>% 
   group_by(method) %>% 
-  summarize(se = sd(rd))
+  summarize(se = sd(rd),
+            p_l = quantile(rd, probs=0.025),
+            p_u = quantile(rd, probs=0.975))
 
 res <- left_join(res, boot.summ, by="method") %>% 
-  mutate(lower = rd - 1.96*se,
-         upper = rd + 1.96*se)
+  mutate(lower1 = rd - 1.96*se,
+         lower2 = p_l,
+         upper1 = rd + 1.96*se,
+         upper2 = p_u)
 
-write.table(res, file="../results/results_ipw.txt", sep="\t", row.names=FALSE)
+write.table(res, file="../results/results_ipw_1000boot.txt", sep="\t", row.names=FALSE)
 
 
